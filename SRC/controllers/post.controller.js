@@ -70,7 +70,7 @@ export const getSinglePost = async (req, res) => {
     const singlePost = await Post.findById(req.params.id)
     if (!singlePost) {
       console.log('NO post in database')
-      res.status(404).json({message: 'NO post in database'})
+      res.status(404).json({message: 'NO post in database'})  
       // throw new error 
     } else {
       res.status(200).json({message: 'Posts found successfully', singlePost})
@@ -103,53 +103,108 @@ export const deletePost = async (req, res) => {
   }
 }
 
-export const likePost = async (req, res) => {
+// export const likePost = async (req, res) => {
 
-  const {postId} = req.params
-  const userId = req.user._id
-  // let {likes} = req.body
+//   const {postId} = req.params
+//   const userId = req.user._id
+//   // let {likes} = req.body
 
-  try {
-    const post = await Post.findById(postId)
+//   try {
+//     const post = await Post.findById(postId)
 
-    if(!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
-    if (post.likes.includes(userId)) {
-      return res.status(400).json({ message: 'Post already liked' });
-    }
+//     if(!post) {
+//       return res.status(404).json({ message: 'Post not found' });
+//     }
+//     if (post.likes.includes(userId)) {
+//       return res.status(400).json({ message: 'Post already liked' });
+//     }
 
-    post.likes.push(userId);
-    await post.save();
-    res.status(200).json({ message: 'Post liked successfully', post });
+//     post.likes.push(userId);
+//     await post.save();
+//     res.status(200).json({ message: 'Post liked successfully', post });
 
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
 
-}
+// }
 
-export const unlikePost = async (req, res) => {
-  const {postId} = req.params
-  const userId = req.user._id
+// export const unlikePost = async (req, res) => {
+//   const {postId} = req.params
+//   const userId = req.user._id
 
-  try {
-    const post = await Post.findById(postId);
-    if (!post) {
-        return res.status(404).json({ message: 'Post not found' });
-    }
-    if (!post.likes.includes(userId)) {
-      return res.status(400).json({ message: 'Post not liked' });
-  }
+//   try {
+//     const post = await Post.findById(postId);
+//     if (!post) {
+//         return res.status(404).json({ message: 'Post not found' });
+//     }
+//     if (!post.likes.includes(userId)) {
+//       return res.status(400).json({ message: 'Post not liked' });
+//   }
 
-  post.likes = post.likes.filter(id => id.toString() !== userId.toString());
-  await post.save();
+//   post.likes = post.likes.filter(id => id.toString() !== userId.toString());
+//   await post.save();
 
-  res.status(200).json({ message: 'Post unliked successfully', post });
+//   res.status(200).json({ message: 'Post unliked successfully', post });
 
     
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+//   } catch (error) { 
+//     res.status(500).json({ message: error.message });
+//   }
 
-}
+// }
+
+
+
+export const likeUnlikePost = async (req, res) => {
+  try {
+    const { id: postId } = req.params;
+    const userId = req.user._id;
+
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    const userLikedPost = post.likes.includes(userId);
+    if (userLikedPost) {
+      await Post.updateOne({ _id: postId }, { $pull: { likes: userId } });
+      res.status(200).json({ message: "Post unliked successfully" });
+    } else {
+      post.likes.push(userId);
+      await post.save();
+      res.status(200).json({ message: "Post liked successfully" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+    console.error(error);
+  }
+};
+
+export const replyToPost = async (req, res) => {
+	try {
+		const { text } = req.body;
+		const postId = req.params.id;
+		const userId = req.user._id;
+		const userProfilePic = req.user.profilePic;
+		const username = req.user.username;
+
+		if (!text) {
+			return res.status(400).json({ error: "Text field is required" });
+		}
+
+		const post = await Post.findById(postId);
+		if (!post) {
+			return res.status(404).json({ error: "Post not found" });
+		}
+
+		const reply = { userId, text, userProfilePic, username };
+
+		post.replies.push(reply);
+		await post.save();
+
+		res.status(200).json(reply);
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+};

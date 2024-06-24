@@ -93,3 +93,74 @@ export const updateUser = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+export const freezeAccount = async(req, res) => {
+    try {
+        const user = await User.findById(req.user._id)
+        if (!user) {
+            res.status(401).json({message: "You are unauthorized to freeze this account"})
+        }
+        user.isFrozen = true
+        await user.save()
+    } catch (error) {
+        res.status(500).json({message:error})
+    }
+}
+
+export const getSuggestedUsers = async (req, res) => {
+	try {
+		const userId = req.user._id;
+
+		const usersFollowedByYou = await User.findById(userId).select("following");
+
+		const users = await User.aggregate([
+			{
+				$match: {
+					_id: { $ne: userId },
+				},
+			},
+			{
+				$sample: { size: 10 },
+			},
+		]);
+		const filteredUsers = users.filter((user) => !usersFollowedByYou.following.includes(user._id));
+		const suggestedUsers = filteredUsers.slice(0, 4);
+
+		suggestedUsers.forEach((user) => (user.password = null));
+
+		res.status(200).json(suggestedUsers);
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+};
+
+export const followAndUnfollow = async (req, res) => {
+    try {
+        const id = req.params.id
+        const userToModify = await User.findById(id)
+        const currentUser = await User.findById(req.user._id)
+
+        if (id === req.user._id.toString()) {
+            res.status(400).json({message: "You cannot follow/unfollow yourself"})
+        }
+        if (!userToModify || !currentUser) {
+            res.status(404).json({message:'User not found'})
+        }
+        const isFollowing = currentUser.followers.includes(id)
+        if (isFollowing) {
+            // unfollow user
+            await User.findByIdAndUpdate(id,{$pull:{followers:req.user._id}})
+            await User.findByIdAndUpdate(req.user_id, {$pull: {following:id}})
+            res.status(200).json({message: "You have successfully unfollowed this user"})
+        } else {
+            // follow user
+            await User.findByIdAndUpdate(id,{$push:{followers:req.user._id}})
+            await User.findByIdAndUpdate(req.user_id,{$push:{following:id}})
+            res.status(200).json({message: "You have successfully followed this user"})
+        }
+    } catch (error) {
+        console.log();
+        res.status(500).json(error.message)
+    }
+}
+
